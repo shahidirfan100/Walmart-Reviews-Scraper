@@ -1,0 +1,75 @@
+{
+  "title": "Walmart Reviews Scraper",
+  "description": "Extract Walmart product reviews using product URL or product ID.",
+  "type": "object",
+  "schemaVersion": 1,
+  "properties": {
+    "productUrl": {
+      "title": "Product URL",
+      "type": "string",
+      "description": "Walmart product or reviews URL.",
+      "editor": "textfield",
+      "prefill": "https://www.walmart.com/reviews/product/18023573301?entryPoint=viewAllReviewsBottom"
+    },
+    "productId": {
+      "title": "Product ID",
+      "type": "string",
+      "description": "Walmart product ID. Used if URL is not provided.",
+      "editor": "textfield",
+      "prefill": "18023573301"
+    },
+    "sort": {
+      "title": "Sort Order",
+      "type": "string",
+      "description": "Review sort order.",
+      "editor": "select",
+      "default": "relevancy",
+      "prefill": "relevancy",
+      "enum": [
+        "relevancy",
+        "helpful",
+        "submission-desc",
+        "submission-asc",
+        "rating-desc",
+        "rating-asc"
+      ],
+      "enumTitles": [
+        "Most relevant",
+        "Most helpful",
+        "Newest",
+        "Oldest",
+        "Highest rating",
+        "Lowest rating"
+      ]
+    },
+    "results_wanted": {
+      "title": "Results wanted",
+      "type": "integer",
+      "description": "Maximum number of reviews to save.",
+      "editor": "number",
+      "minimum": 1,
+      "default": 20,
+      "prefill": 20
+    },
+    "max_pages": {
+      "title": "Max pages",
+      "type": "integer",
+      "description": "Maximum review pages to fetch.",
+      "editor": "number",
+      "minimum": 1,
+      "default": 10,
+      "prefill": 3
+    },
+    "proxyConfiguration": {
+      "title": "Proxy configuration",
+      "type": "object",
+      "description": "Optional proxy settings. Use Apify Proxy for best anti-blocking stability.",
+      "editor": "proxy",
+      "default": {
+        "useApifyProxy": false
+      }
+    }
+  },
+  "required": [],
+  "additionalProperties": false
+}

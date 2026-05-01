@@ -1,0 +1,129 @@
+{
+  "actorSpecification": 1,
+  "fields": {
+    "productId": {
+      "title": "Product ID",
+      "type": "string",
+      "description": "Walmart product ID"
+    },
+    "productName": {
+      "title": "Product Name",
+      "type": "string",
+      "description": "Product name"
+    },
+    "reviewId": {
+      "title": "Review ID",
+      "type": "string",
+      "description": "Unique review ID"
+    },
+    "reviewTitle": {
+      "title": "Review Title",
+      "type": "string",
+      "description": "Review headline"
+    },
+    "reviewText": {
+      "title": "Review Text",
+      "type": "string",
+      "description": "Review content"
+    },
+    "rating": {
+      "title": "Rating",
+      "type": "number",
+      "description": "Star rating"
+    },
+    "reviewSubmissionTime": {
+      "title": "Review Date",
+      "type": "string",
+      "description": "Review submission date"
+    },
+    "recommended": {
+      "title": "Recommended",
+      "type": "boolean",
+      "description": "Whether reviewer recommends the product"
+    },
+    "userNickname": {
+      "title": "Reviewer",
+      "type": "string",
+      "description": "Reviewer nickname"
+    },
+    "userLocation": {
+      "title": "Reviewer Location",
+      "type": "string",
+      "description": "Reviewer location"
+    },
+    "mediaUrls": {
+      "title": "Media URLs",
+      "type": "array",
+      "description": "Image/media URLs from the review"
+    },
+    "productUrl": {
+      "title": "Product URL",
+      "type": "string",
+      "description": "Source review page URL"
+    }
+  },
+  "views": {
+    "overview": {
+      "title": "Overview",
+      "transformation": {
+        "fields": [
+          "productId",
+          "productName",
+          "reviewId",
+          "rating",
+          "reviewTitle",
+          "reviewSubmissionTime",
+          "recommended",
+          "userNickname",
+          "userLocation",
+          "productUrl"
+        ]
+      },
+      "display": {
+        "component": "table",
+        "properties": {
+          "productId": {
+            "label": "Product ID",
+            "format": "text"
+          },
+          "productName": {
+            "label": "Product",
+            "format": "text"
+          },
+          "reviewId": {
+            "label": "Review ID",
+            "format": "text"
+          },
+          "rating": {
+            "label": "Rating",
+            "format": "number"
+          },
+          "reviewTitle": {
+            "label": "Title",
+            "format": "text"
+          },
+          "reviewSubmissionTime": {
+            "label": "Date",
+            "format": "text"
+          },
+          "recommended": {
+            "label": "Recommended",
+            "format": "boolean"
+          },
+          "userNickname": {
+            "label": "Reviewer",
+            "format": "text"
+          },
+          "userLocation": {
+            "label": "Location",
+            "format": "text"
+          },
+          "productUrl": {
+            "label": "URL",
+            "format": "link"
+          }
+        }
+      }
+    }
+  }
+}
