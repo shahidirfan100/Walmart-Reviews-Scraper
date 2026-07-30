@@ -186,6 +186,8 @@ Scraping public web data can be legal, but you are responsible for complying wit
 ## Related Actors
 
 - [Target Reviews Scraper](https://apify.com/shahidirfan/target-reviews-scraper) - Collect customer reviews from Target product pages.
+- [AliExpress Reviews Scraper](https://apify.com/shahidirfan/aliexpress-reviews-scraper) - Extract product reviews from AliExpress.
+- [IKEA Reviews Scraper](https://apify.com/shahidirfan/ikea-reviews-scraper) - Collect customer reviews from IKEA product pages.
 - [Walmart Product Scraper](https://apify.com/shahidirfan/walmart-product-scraper) - Extract Walmart product listings, pricing, and availability.
 
 ## Support
