@@ -14,9 +14,8 @@
     "productId": {
       "title": "Product ID",
       "type": "string",
-      "description": "Walmart product ID. Used if URL is not provided.",
-      "editor": "textfield",
-      "prefill": "18023573301"
+      "description": "Alternative to Product URL. Used only when a product URL is not provided.",
+      "editor": "textfield"
     },
     "sort": {
       "title": "Sort Order",
@@ -63,10 +62,13 @@
     "proxyConfiguration": {
       "title": "Proxy configuration",
       "type": "object",
-      "description": "Optional proxy settings. Use Apify Proxy for best anti-blocking stability.",
+      "description": "Apify Residential Proxy is enabled by default for Walmart access. Disable it only when direct access is known to work.",
       "editor": "proxy",
       "default": {
-        "useApifyProxy": false
+        "useApifyProxy": true,
+        "apifyProxyGroups": [
+          "RESIDENTIAL"
+        ]
       }
     }
   },

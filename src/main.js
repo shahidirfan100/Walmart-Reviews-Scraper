@@ -1,9 +1,10 @@
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+
 import { Actor, log } from 'apify';
 import { Dataset } from 'crawlee';
-import { gotScraping } from 'got-scraping';
+import { Impit } from 'impit';
 
 const SORT_OPTIONS = new Set([
     'relevancy',
@@ -84,8 +85,27 @@ const normalizedProxyConfig = normalizeProxyConfiguration(proxyConfig);
 const proxyConfiguration = normalizedProxyConfig
     ? await Actor.createProxyConfiguration(normalizedProxyConfig)
     : undefined;
-let proxyDisabled = false;
-let proxyDisableWarningPrinted = false;
+let proxyUrl;
+
+if (proxyConfiguration) {
+    try {
+        proxyUrl = await proxyConfiguration.newUrl();
+    } catch (error) {
+        log.warning(`Apify Proxy unavailable, falling back to direct requests: ${error.message}`);
+    }
+}
+
+const httpClient = new Impit({
+    browser: 'ios18',
+    timeout: 30000,
+    ...(proxyUrl && { proxyUrl }),
+});
+
+if (proxyUrl) {
+    log.info('Using a stable configured proxy identity for Walmart requests.');
+} else {
+    log.warning('No proxy configured; Walmart may return a robot-check page.');
+}
 
 const resultsWanted = Math.max(1, Number.parseInt(String(results_wanted), 10) || 20);
 const maxPages = Math.max(1, Number.parseInt(String(max_pages), 10) || 10);
@@ -221,26 +241,53 @@ function wait(ms) {
 }
 
 function buildRequestHeaders(targetUrl) {
-    const origin = new URL(targetUrl).origin;
+    const { origin } = new URL(targetUrl);
 
     return {
-        accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-        'accept-language': 'en-US,en;q=0.9',
-        'cache-control': 'max-age=0',
-        pragma: 'no-cache',
         referer: `${origin}/`,
-        'sec-fetch-dest': 'document',
-        'sec-fetch-mode': 'navigate',
-        'sec-fetch-site': 'same-origin',
-        'sec-fetch-user': '?1',
-        'upgrade-insecure-requests': '1',
     };
 }
 
 function isRobotBlockError(error) {
+    const statusCode = Number(error?.statusCode);
     const message = String(error?.message || '');
-    return message.includes('Robot or human?')
-        || message.includes('missing __NEXT_DATA__');
+    return (
+        [403, 418].includes(statusCode) ||
+        message.includes('Robot or human?') ||
+        message.includes('missing __NEXT_DATA__')
+    );
+}
+
+function isRetryableError(error) {
+    const statusCode = Number(error?.statusCode);
+    if ([408, 425, 429].includes(statusCode) || statusCode >= 500) return true;
+    if (isRobotBlockError(error)) return true;
+
+    const code = String(error?.code || '');
+    const message = String(error?.message || '');
+    return (
+        ['ABORT_ERR', 'ECONNRESET', 'ECONNREFUSED', 'EAI_AGAIN', 'ETIMEDOUT'].includes(code) ||
+        /(?:timed out|timeout|network|fetch failed|connection (?:reset|closed|refused)|temporary failure)/i.test(
+            message,
+        )
+    );
+}
+
+function getRetryAfterMs(response) {
+    const retryAfter = response.headers?.get?.('retry-after');
+    if (!retryAfter) return undefined;
+
+    const seconds = Number(retryAfter);
+    if (Number.isFinite(seconds) && seconds >= 0) {
+        return Math.min(seconds * 1000, 15000);
+    }
+
+    const retryAt = Date.parse(retryAfter);
+    if (!Number.isNaN(retryAt)) {
+        return Math.min(Math.max(retryAt - Date.now(), 0), 15000);
+    }
+
+    return undefined;
 }
 
 function mapReview(review, baseRecord) {
@@ -297,46 +344,18 @@ async function fetchReviewPage(targetUrl) {
 
     for (let attempt = 1; attempt <= FETCH_RETRY_LIMIT; attempt++) {
         try {
-            let proxyUrl;
-            if (proxyConfiguration && !proxyDisabled) {
-                try {
-                    proxyUrl = await proxyConfiguration.newUrl();
-                } catch (error) {
-                    proxyDisabled = true;
-                    if (!proxyDisableWarningPrinted) {
-                        proxyDisableWarningPrinted = true;
-                        log.warning(`Apify Proxy unavailable, falling back to direct requests: ${error.message}`);
-                    }
-                }
-            }
-
-            const response = await gotScraping({
-                url: targetUrl,
-                proxyUrl,
-                throwHttpErrors: false,
-                retry: {
-                    limit: 0,
-                },
-                timeout: {
-                    request: 30000,
-                },
-                http2: false,
+            const response = await httpClient.fetch(targetUrl, {
                 headers: buildRequestHeaders(targetUrl),
-                headerGeneratorOptions: {
-                    browsers: [
-                        { name: 'chrome', minVersion: 138, maxVersion: 141 },
-                    ],
-                    devices: ['desktop'],
-                    locales: ['en-US', 'en'],
-                    operatingSystems: ['windows', 'macos'],
-                },
             });
 
-            if (response.statusCode < 200 || response.statusCode >= 300) {
-                throw new Error(`HTTP ${response.statusCode} for ${targetUrl}`);
+            if (!response.ok) {
+                const requestError = new Error(`HTTP ${response.status} for ${targetUrl}`);
+                requestError.statusCode = response.status;
+                requestError.retryAfterMs = getRetryAfterMs(response);
+                throw requestError;
             }
 
-            const html = response.body;
+            const html = await response.text();
             return {
                 ok: true,
                 nextData: extractNextData(html),
@@ -345,12 +364,17 @@ async function fetchReviewPage(targetUrl) {
         } catch (error) {
             lastError = error;
             const blocked = isRobotBlockError(error);
+            const retryable = isRetryableError(error);
             const logMessage = `Attempt ${attempt}/${FETCH_RETRY_LIMIT} failed for ${targetUrl}: ${error.message}`;
             log.debug(logMessage);
 
-            const backoffMs = blocked
-                ? (900 * attempt) + Math.floor(Math.random() * 700)
-                : (600 * attempt) + Math.floor(Math.random() * 400);
+            if (!retryable || attempt === FETCH_RETRY_LIMIT) break;
+
+            const backoffMs =
+                error.retryAfterMs ??
+                (blocked
+                    ? 900 * attempt + Math.floor(Math.random() * 700)
+                    : 600 * attempt + Math.floor(Math.random() * 400));
             await wait(backoffMs);
         }
     }
@@ -408,7 +432,7 @@ for (let page = 1; page <= maxPages; page++) {
     consecutiveFetchFailures = 0;
     processedPages += 1;
 
-    const nextData = pageResult.nextData;
+    const { nextData } = pageResult;
     const payload = nextData?.props?.pageProps?.initialData?.data;
 
     const reviewsRoot = payload?.reviews;
